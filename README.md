@@ -308,4 +308,4 @@ aws s3 rm s3://marathon2026-restaurant-artifacts-$ACCOUNT_ID/ --recursive
 aws s3api delete-bucket --bucket marathon2026-restaurant-artifacts-$ACCOUNT_ID --region eu-north-1
 ```
 
-Only do this if you are sure you no longer need the stored Syndicate build artifacts.
+Only do this if you are sure you no longer need the stored Syndicate build artifacts.# marathon2026Zhelieva
