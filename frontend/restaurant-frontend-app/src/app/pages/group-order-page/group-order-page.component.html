@@ -36,7 +36,7 @@
       </dl>
     </header>
 
-    @if (unsubmittedCount() > 0) {
+    @if (groupStatus()?.status !== 'Submitted' && unsubmittedCount() > 0) {
       <aside class="submission-warning" role="status">{{ warningText() }}</aside>
     }
 
