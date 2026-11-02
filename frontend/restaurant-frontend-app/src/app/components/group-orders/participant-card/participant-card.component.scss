@@ -1,0 +1,109 @@
+@use 'app/shared/styles/abstracts/colors' as color;
+
+.card {
+  padding: 1rem;
+  border: 1px solid color.$neutral-200;
+  border-radius: 8px;
+  background: color.$neutral-0;
+}
+
+.title {
+  margin: 0 0 0.75rem;
+  color: color.$neutral-900;
+  font-size: 1.125rem;
+}
+
+.items {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid color.$neutral-100;
+}
+
+.dish-image,
+.dish-initial {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.dish-image {
+  object-fit: cover;
+}
+
+.dish-initial {
+  display: grid;
+  place-items: center;
+  background: color.$green-100;
+  color: color.$green-800;
+}
+
+.dish-name,
+.quantity,
+.line-total {
+  margin: 0;
+}
+
+.dish-name {
+  min-width: 0;
+  color: color.$neutral-900;
+}
+
+.quantity,
+.line-total {
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  color: color.$neutral-600;
+}
+
+.subtotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color.$neutral-100;
+  font-weight: 600;
+}
+
+.status {
+  display: inline-block;
+  margin: 0.75rem 0 0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.submitted {
+  background: color.$green-100;
+  color: color.$green-800;
+}
+
+.pending {
+  background: color.$orange-100;
+  color: color.$neutral-900;
+}
+
+@media (max-width: 360px) {
+  .item {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+  }
+
+  .line-total {
+    grid-column: 2 / -1;
+  }
+}

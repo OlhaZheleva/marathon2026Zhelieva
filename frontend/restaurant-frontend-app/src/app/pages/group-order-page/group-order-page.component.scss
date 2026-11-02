@@ -1,0 +1,237 @@
+@use 'app/shared/styles/abstracts/colors' as color;
+
+:host {
+  display: block;
+  min-height: 100%;
+  background: color.$neutral-100;
+}
+
+.group-order-page {
+  width: min(100% - 2rem, 820px);
+  margin: 0 auto;
+  padding: 1.5rem 0 2rem;
+}
+
+.page-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid color.$green-150;
+}
+
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+h1 {
+  margin: 0;
+  color: color.$neutral-900;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.order-status {
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  background: color.$orange-100;
+  color: color.$neutral-900;
+  font-size: 0.75rem;
+}
+
+.order-status--submitted {
+  background: color.$green-100;
+  color: color.$green-800;
+}
+
+.reservation-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  margin: 0;
+}
+
+.detail {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.detail dt {
+  color: color.$neutral-600;
+  font-size: 0.75rem;
+}
+
+.detail dd {
+  margin: 0;
+  color: color.$neutral-900;
+  font-size: 0.875rem;
+}
+
+.participants {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.submission-warning {
+  margin-top: 1.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid color.$orange-100;
+  border-radius: 8px;
+  background: color.$orange-30;
+  color: color.$neutral-900;
+}
+
+.consolidated-order {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: color.$neutral-0;
+}
+
+.consolidated-order h2 {
+  margin: 0 0 0.75rem;
+  color: color.$neutral-900;
+  font-size: 1.125rem;
+}
+
+.consolidated-items {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.consolidated-items li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: color.$neutral-700;
+}
+
+.empty-state,
+.loading {
+  margin: 1.5rem 0;
+  color: color.$neutral-600;
+}
+
+.error-state {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  color: color.$red-400;
+}
+
+.error-state p {
+  margin: 0;
+}
+
+.grand-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid color.$green-150;
+}
+
+.grand-total h2,
+.grand-total p {
+  margin: 0;
+}
+
+.grand-total h2 {
+  color: color.$neutral-900;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.grand-total p {
+  color: color.$green-800;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.submit-button,
+.button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit-button {
+  width: 100%;
+  margin-top: 1rem;
+  background: color.$green-800;
+  color: color.$neutral-0;
+}
+
+.submit-button:not(:disabled):hover,
+.button--primary:not(:disabled):hover {
+  background: color.$green-600;
+}
+
+.submit-button:focus-visible,
+.button:focus-visible {
+  outline: 3px solid color.$blue-400;
+  outline-offset: 3px;
+}
+
+.submit-button:disabled,
+.button:disabled {
+  background: color.$neutral-400;
+  color: color.$neutral-0;
+  cursor: not-allowed;
+}
+
+.button--primary {
+  padding: 0 1.25rem;
+  background: color.$green-800;
+  color: color.$neutral-0;
+}
+
+.button--secondary {
+  padding: 0 1.25rem;
+  border: 1px solid color.$neutral-200;
+  background: color.$neutral-0;
+  color: color.$neutral-700;
+}
+
+.confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .group-order-page {
+    width: min(100% - 1.5rem, 820px);
+    padding-top: 1rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .reservation-details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grand-total h2,
+  .grand-total p {
+    font-size: 1.25rem;
+  }
+
+  .confirmation-actions {
+    flex-direction: column-reverse;
+  }
+}

@@ -1,15 +1,20 @@
+using Amazon.DynamoDBv2.Model;
 using APIHandler.Constants;
+using APIHandler.Constants.Orders;
 using APIHandler.Entities;
 using APIHandler.Exceptions;
 using APIHandler.Models.GroupReservation;
 using APIHandler.Models.GuestReservation;
 using APIHandler.Repositories.GroupReservations;
 using APIHandler.Repositories.GuestSessions;
+using APIHandler.Repositories.Orders;
 using APIHandler.Repositories.Reservations;
 using APIHandler.Repositories.Tables;
 using APIHandler.Services.Auth;
 using APIHandler.Services.Locations;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace APIHandler.Services.GroupReservations;
@@ -19,6 +24,7 @@ public class GroupReservationService(
     ITableRepository tableRepository,
     IReservationRepository reservationRepository,
     IGuestSessionRepository guestSessionRepository,
+    IOrderRepository orderRepository,
     IUserService userService,
     ILocationService locationService) : IGroupReservationService
 {
@@ -141,6 +147,92 @@ public class GroupReservationService(
             throw new GroupReservationExpiredException();
 
         return new GetGroupInviteTokenResponse(groupReservation.ReservationToken);
+    }
+
+    public async Task<List<SubmitGroupPreOrderItem>> SubmitGroupPreOrderAsync(string userId, string groupReservationId, string reservationId)
+    {
+        GroupReservation group = await groupReservationRepository.GetGroupReservationByIdAsync(groupReservationId)
+            ?? throw new GroupReservationNotFoundException();
+
+        Reservation reservation = await reservationRepository.GetReservationByIdAsync(group.ReservationId)
+            ?? throw new ReservationNotFoundException($"Reservation {group.ReservationId} was not found.");
+
+        if (reservation.CustomerId != userId)
+            throw new ActionForbiddenException("Only the reservation owner can perform this action.");
+
+        if (reservationId != group.ReservationId)
+            throw new ValidationException("'reservationId' does not match the group reservation.");
+
+        if (group.Status == GroupReservationStatus.Submitted)
+            throw new GroupReservationSubmittedException();
+
+        if (group.Status == GroupReservationStatus.Closed)
+            throw new GroupReservationExpiredException();
+
+        List<GuestSession> sessions = (await guestSessionRepository.GetAllByGroupReservationIdAsync(groupReservationId))
+            .Where(s => s.IsSubmitted)
+            .ToList();
+
+        if (sessions.Count == 0)
+            throw new ValidationException("There are no submitted guest sessions in this group reservation.");
+
+        List<SubmitGroupPreOrderItem> consolidated = sessions
+            .SelectMany(s => s.Dishes ?? [])
+            .GroupBy(d => d.DishId)
+            .Select(g => new SubmitGroupPreOrderItem(g.Key, g.Sum(d => d.Quantity)))
+            .ToList();
+
+        if (consolidated.Count == 0)
+            throw new ValidationException("Submitted guest sessions do not contain any dishes.");
+
+        Order order = await orderRepository.GetOrderByReservationIdAsync(group.ReservationId)
+            ?? throw new ValidationException("Order for this reservation does not exist.");
+
+        order.Dishes ??= [];
+
+        foreach (SubmitGroupPreOrderItem item in consolidated)
+        {
+            OrderItem? existing = order.Dishes.FirstOrDefault(d => d.DishId == item.DishId);
+
+            if (existing is not null)
+                existing.Quantity += item.Quantity;
+            else
+                order.Dishes.Add(new OrderItem { DishId = item.DishId, Quantity = item.Quantity, State = OrderItemState.Pending });
+        }
+
+        order.Status = OrderStatus.SubmittedByCustomer;
+
+        try
+        {
+            await orderRepository.SaveOrderAndSubmitGroupAsync(order, group.GroupReservationId);
+        }
+        catch (TransactionCanceledException ex)
+        {
+            if (ex.CancellationReasons is null ||
+                ex.CancellationReasons.Count <= 1 ||
+                ex.CancellationReasons[1].Code != "ConditionalCheckFailed")
+            {
+                throw;
+            }
+
+            GroupReservation? currentGroup = await groupReservationRepository.GetGroupReservationByIdAsync(group.GroupReservationId);
+            if (currentGroup is null)
+                throw new GroupReservationNotFoundException();
+
+            switch (currentGroup.Status)
+            {
+                case GroupReservationStatus.Submitted:
+                    throw new GroupReservationSubmittedException();
+                case GroupReservationStatus.Closed:
+                    throw new GroupReservationExpiredException();
+                case GroupReservationStatus.Open:
+                    throw new ValidationException("Group reservation changed during submission. Please retry due to a concurrent modification.");
+                default:
+                    throw;
+            }
+        }
+
+        return consolidated;
     }
 }
 

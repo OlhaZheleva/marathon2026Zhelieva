@@ -555,12 +555,15 @@ Response: `200 OK`
 ```
 
 ### `GET` /reservations/{reservationId}/guest-session-id
+Owner-only (`Reservation.CustomerId` equals the caller). Returns the owner's guest session id; the session is created if missing, otherwise the existing one is returned. Never creates a group reservation.
+
 Response: `200 OK`
 ```json
 {
-  "guestSessionId": "string"
+  "guestSessionId": "owner-session-123"
 }
 ```
+Errors: `401` not authenticated, `403` caller is not the owner, `404` reservation or group reservation not found.
 
 
 ### `DELETE` /reservations
@@ -1180,43 +1183,126 @@ Response: 200 OK
 ```
 
 ### `POST` /group-reservations/{groupReservationId}/submit
-Response: 200 OK
+Owner-only. Consolidates dishes of all `submitted` guest sessions (merged by `dishId`), merges them into the reservation's order (existing items keep their state, new items are `Pending`), sets order status `SubmittedByCustomer` and group status `Submitted` in one DynamoDB transaction.
+
+Request body:
 ```json
 {
-  "message": "Group reservation pre-order submitted successfully."
+  "reservationId": "reservation-123"
 }
 ```
 
+Response: 200 OK
+```json
+[
+  { "dishId": "dish1", "quantity": 3 },
+  { "dishId": "dish2", "quantity": 2 }
+]
+```
+Errors: `400` missing/mismatching `reservationId`, group already `Submitted` or `Closed`, no submitted sessions, no dishes, or order missing; `401` not authenticated; `403` caller is not the owner; `404` group reservation or reservation not found.
+
 ### `GET` /guest/groups/{groupReservationId}/sessions
-Returns participant sessions of a group pre-order. Only the reservation Owner can call it (401 if unauthenticated, 403 if not the Owner, 404 if the group reservation does not exist).
+Owner-only: returns the participant sessions of the group pre-order with items and totals.
 
 Response: 200 OK
 ```json
 {
   "participants": [
     {
-      "id": "session1",
-      "type": "Guest",
-      "name": "Andrii",
+      "id": "3f2b8c1e-6a4d-4e7b-9c10-5d8a2f1b7e34",
+      "type": "Owner",
+      "name": "Owner",
       "items": [
         {
-          "dish": { "id": "dish1", "name": "Caesar Salad", "price": 180 },
+          "dish": {
+            "id": "a1b2c3d4-1111-4222-8333-944455556666",
+            "name": "Caesar Salad",
+            "description": "Romaine lettuce, parmesan, croutons and Caesar dressing",
+            "dishType": "Appetizer",
+            "price": 9.5,
+            "weight": "250 g",
+            "calories": "320 kcal",
+            "proteins": "12 g",
+            "fats": "22 g",
+            "carbohydrates": "18 g",
+            "vitamins": "A, C, K",
+            "imageUrl": "https://example.com/images/caesar-salad.jpg",
+            "state": "Available"
+          },
           "quantity": 2
         }
       ],
-      "total": 360,
+      "total": 19,
       "isSubmitted": true
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "type": "Guest",
+      "name": "Andrii",
+      "items": [],
+      "total": 0,
+      "isSubmitted": false
     }
   ],
-  "total": 360
+  "total": 19
 }
 ```
-`type` is `Guest` or `Owner` (the owner's own session). With no participants: `"participants": []`, `"total": 0`.
+`type` is `Owner` for the reservation owner's own session and `Guest` for guest sessions. Session items that reference a dish that no longer exists are skipped and are not counted in `total`. No participants: `"participants": []`, `"total": 0`.
+
+Errors:
+- 400 - `groupReservationId` is missing in the path
+- 401 - user is not authenticated
+- 403 - user is not the Owner of the group reservation
+- 404 - group reservation (or its parent reservation) not found
 
 ### `DELETE` /guest/groups/{groupReservationId}/sessions/{guestSessionId}
 Response: 200 OK
 ```json
 {
-  "message": "Guest session removed from group successfully."
+  "participants": [
+    {
+      "id": "3f2b8c1e-6a4d-4e7b-9c10-5d8a2f1b7e34",
+      "type": "Owner",
+      "name": "Owner",
+      "items": [
+        {
+          "dish": {
+            "id": "a1b2c3d4-1111-4222-8333-944455556666",
+            "name": "Caesar Salad",
+            "description": "Romaine lettuce, parmesan, croutons and Caesar dressing",
+            "dishType": "Appetizer",
+            "price": 9.5,
+            "weight": "250 g",
+            "calories": "320 kcal",
+            "proteins": "12 g",
+            "fats": "22 g",
+            "carbohydrates": "18 g",
+            "vitamins": "A, C, K",
+            "imageUrl": "https://example.com/images/caesar-salad.jpg",
+            "state": "Available"
+          },
+          "quantity": 2
+        }
+      ],
+      "total": 19,
+      "isSubmitted": true
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "type": "Guest",
+      "name": "Andrii",
+      "items": [],
+      "total": 0,
+      "isSubmitted": false
+    }
+  ],
+  "total": 19
 }
 ```
+Returns the remaining group snapshot using `GetAllSessionsResponse`: each participant has `id`, `type`, `name`, `items`, `total`, and `isSubmitted`; the response also includes the overall `total`. Missing dishes are skipped and excluded from totals. An empty group returns `"participants": []` and `"total": 0`.
+
+Errors:
+- 400 - `groupReservationId` or `guestSessionId` is missing in the path, the target guest session belongs to another group, or the target is the reservation owner's session
+- 401 - caller is unauthenticated
+- 403 - caller is not the reservation Owner
+- 404 - group reservation, parent reservation, or target guest session not found

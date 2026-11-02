@@ -157,12 +157,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /guest/groups/{groupReservationId}/submit:
+  /group-reservations/{groupReservationId}/submit:
     post:
       tags:
         - Group Reservations
       summary: Submit group pre-order
-      description: Submits the pre-order for a group reservation, converting guest sessions to orders
+      description: >-
+        Owner only. Consolidates the dishes of all submitted guest sessions of the group (merged by dishId, quantities summed),
+        merges them into the reservation's existing order (existing items keep their state, new items are Pending),
+        sets the order status to SubmittedByCustomer and the group reservation status to Submitted in one atomic transaction.
       operationId: submitGroupPreOrder
       parameters:
         - name: groupReservationId
@@ -171,6 +174,8 @@ paths:
           description: The ID of the group reservation
           schema:
             type: string
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -185,10 +190,29 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  description: Enriched dishes data
+                  $ref: '#/components/schemas/SubmitGroupPreOrderItem'
         '400':
-          description: Invalid request - missing parameters or validation error
+          description: >-
+            Invalid request - reservationId missing or different from the group's reservation, group reservation already submitted or closed,
+            no submitted guest sessions, submitted sessions contain no dishes, or the order does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not the reservation owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Group reservation or reservation not found
           content:
             application/json:
               schema:
@@ -279,7 +303,7 @@ paths:
       tags:
         - Guest Sessions
       summary: Get all sessions for group reservation
-      description: Retrieves participant sessions of a group pre-order. Only the reservation Owner can call this endpoint.
+      description: Retrieves all guest sessions for a group reservation. Only the Owner of the group reservation can call this endpoint.
       operationId: getAllSessionsForGroup
       parameters:
         - name: groupReservationId
@@ -304,19 +328,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: User is not authenticated
+          description: Unauthorized - user is not authenticated
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: User is not the Owner of this group reservation
+          description: Forbidden - user is not the Owner of the group reservation
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Group reservation not found or GroupId is required
+          description: Group reservation (or its parent reservation) not found
           content:
             application/json:
               schema:
@@ -466,26 +490,33 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: Guest session deleted successfully
+          description: Guest session deleted successfully; returns the updated group sessions snapshot
           content:
             application/json:
               schema:
-                type: object
-                description: Updated snapshot of the group reservation
+                $ref: '#/components/schemas/GetAllSessionsResponse'
         '400':
-          description: Invalid request - missing required path parameters
+          description: >-
+            Missing groupReservationId or guestSessionId path parameter, target guest session belongs to another group,
+            or attempt to delete the reservation owner's session
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Unauthorized
+          description: Caller is unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not the reservation owner
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Group reservation or guest session not found
+          description: Group reservation, parent reservation, or target guest session not found
           content:
             application/json:
               schema:
@@ -496,7 +527,9 @@ paths:
       tags:
         - Guest Sessions
       summary: Get owner's guest session ID
-      description: Retrieves the guest session ID for the reservation owner
+      description: >-
+        Owner only. Returns the guest session ID of the reservation owner. The group reservation must already exist;
+        the owner session is created if it is missing, otherwise the existing one is returned.
       operationId: getOwnerSessionId
       parameters:
         - name: reservationId
@@ -520,8 +553,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not the reservation owner
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Reservation not found
+          description: Reservation or group reservation not found
           content:
             application/json:
               schema:
@@ -582,8 +627,19 @@ components:
       properties:
         reservationId:
           type: string
-          description: The ID of the reservation (owner of the group)
+          description: The ID of the reservation; must equal the group reservation's reservationId
           example: res-123
+
+    SubmitGroupPreOrderItem:
+      type: object
+      properties:
+        dishId:
+          type: string
+          example: dish1
+        quantity:
+          type: integer
+          description: Total quantity of the dish across all submitted guest sessions
+          example: 3
 
     GroupReservationStatusResponse:
       type: object
@@ -698,28 +754,12 @@ components:
     OrderItemResponse:
       type: object
       properties:
-        dishId:
-          type: string
-          description: The ID of the dish
-          example: dish-123
-        dishName:
-          type: string
-          description: Name of the dish
-          example: Spaghetti Carbonara
+        dish:
+          $ref: '#/components/schemas/DishResponse'
         quantity:
           type: integer
           description: Quantity ordered
           example: 2
-        price:
-          type: number
-          format: decimal
-          description: Price per unit
-          example: 22.50
-        total:
-          type: number
-          format: decimal
-          description: Total price for this item
-          example: 45.00
 
     GetGroupInviteTokenResponse:
       type: object
